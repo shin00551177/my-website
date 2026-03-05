@@ -1,48 +1,77 @@
-import React from 'react';
-import { Slider } from 'recharts';
-import 'tailwindcss/tailwind.css';
-import { Lucide } from 'lucide-react';
+import React, { useState } from 'react';
+import { Line } from 'recharts';
 
 const Dashboard = () => {
-  const [userCount, setUserCount] = React.useState(1);
-  const [cpi, setCpi] = React.useState(1);
-  const creatorCount = 50; // Example fixed creator count
-  const paidConversionRate = 0.1; // Example rate
+  // State hooks for user count, CPI, and costs
+  const [userCount, setUserCount] = useState(1);
+  const [cpi, setCpi] = useState(0);
+  const [chatUsage, setChatUsage] = useState(0);
+  const [avatarCreation, setAvatarCreation] = useState(0);
+  const [contentGeneration, setContentGeneration] = useState(0);
+  const [liveStreaming, setLiveStreaming] = useState(0);
+  const [radio, setRadio] = useState(0);
 
-  const featureCosts = {
-    Chat: 60,
-    AvatarCreation: 80,
-    ContentGeneration: 120,
-    LiveStreaming: 90,
-    Radio: 20,
-  };
+  // Feature-based cost calculation
+  const unitPrices = { chat: 60, avatar: 80, content: 120, live: 90, radio: 20 };
+  const chatCost = unitPrices.chat * chatUsage * userCount;
+  const avatarCost = unitPrices.avatar * avatarCreation * userCount;
+  const contentCost = unitPrices.content * contentGeneration * userCount;
+  const liveCost = unitPrices.live * liveStreaming * userCount;
+  const radioCost = unitPrices.radio * radio * userCount;
 
-  const totalCosts = Object.entries(featureCosts).reduce((acc, [feature, unitPrice]) => {
-    const usageTime = 60; // Example usage time in minutes
-    return acc + (unitPrice * usageTime * userCount);
-  }, 0);
-
-  const creatorRevenue = (unitPrice) => unitPrice * userCount * creatorCount;
-  const advertisingRevenue = (unitPrice) => unitPrice * userCount;
-  const authBadgeRevenue = (unitPrice) => unitPrice * userCount * paidConversionRate;
+  // Revenue stream calculations
+  const creatorRevenue = unitPrices.chat * userCount * 1; // Assuming 1 creator
+  const advertisingRevenue = cpi * userCount;
+  const authenticationBadgeRevenue = 100 * userCount; // Assuming 100 yen per badge
 
   return (
     <div className="p-4">
-      <h1 className="text-lg font-bold">Dashboard</h1>
-      <div className="my-4">
-        <label>User Count</label>
-        <Slider value={userCount} min={1} max={1000000} onChange={(value) => setUserCount(value)} />
+      <h1 className="text-2xl font-bold mb-4">Cost and Revenue Dashboard</h1>
+      <div className="mb-4">
+        <label>User Count:</label>
+        <input type="range" min="1" max="1000000" value={userCount} onChange={(e) => setUserCount(e.target.value)} />
       </div>
-      <div className="my-4">
-        <label>CPI</label>
-        <Slider value={cpi} min={1} max={100000} onChange={(value) => setCpi(value)} />
+      <div className="mb-4">
+        <label>CPI:</label>
+        <input type="range" min="1" max="100000" value={cpi} onChange={(e) => setCpi(e.target.value)} />
       </div>
-      <h2 className="text-md font-semibold">Feature-Based Costs: {totalCosts} yen</h2>
-      <h3>Revenue Streams:</h3>
-      <p>Creator Revenue: {creatorRevenue(60)} yen</p>
-      <p>Advertising Revenue: {advertisingRevenue(120)} yen</p>
-      <p>Authentication Badge Revenue: {authBadgeRevenue(20)} yen</p>
-      <Lucide name="chart-line" />
+
+      <h2 className="font-bold mt-4">Feature Costs:</h2>
+      <div className="space-y-4">
+        <div>
+          <label>Chat Usage (min):</label>
+          <input type="number" value={chatUsage} onChange={(e) => setChatUsage(e.target.value)} />
+          <p>Cost: {chatCost} yen</p>
+        </div>
+        <div>
+          <label>Avatar Creation:</label>
+          <input type="number" value={avatarCreation} onChange={(e) => setAvatarCreation(e.target.value)} />
+          <p>Cost: {avatarCost} yen</p>
+        </div>
+        <div>
+          <label>Content Generation:</label>
+          <input type="number" value={contentGeneration} onChange={(e) => setContentGeneration(e.target.value)} />
+          <p>Cost: {contentCost} yen</p>
+        </div>
+        <div>
+          <label>Live Streaming (min):</label>
+          <input type="number" value={liveStreaming} onChange={(e) => setLiveStreaming(e.target.value)} />
+          <p>Cost: {liveCost} yen</p>
+        </div>
+        <div>
+          <label>Radio (mins):</label>
+          <input type="number" value={radio} onChange={(e) => setRadio(e.target.value)} />
+          <p>Cost: {radioCost} yen</p>
+        </div>
+      </div>
+
+      <h2 className="font-bold mt-4">Revenue:</h2>
+      <p>Creator Revenue: {creatorRevenue} yen</p>
+      <p>Advertising Revenue: {advertisingRevenue} yen</p>
+      <p>Authentication Badge Revenue: {authenticationBadgeRevenue} yen</p>
+
+      {/* Charts can be implemented here using Recharts */}
+      {/* Example: <Line data={data} /> */}
     </div>
   );
 };
