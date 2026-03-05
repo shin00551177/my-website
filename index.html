@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Avatar Strategy & P&L Simulator</title>
+    <title>Twomi Business Simulator v11</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Dependencies -->
@@ -29,115 +29,113 @@
         const { useState, useMemo, useEffect } = React;
 
         const App = () => {
-            // Recharts components from window
-            const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } = window.Recharts;
+            // 安全にRechartsコンポーネントを取得
+            const Recharts = window.Recharts || {};
+            const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } = Recharts;
 
-            // 1. Acquisition (獲得)
+            // --- 1. 獲得（Acquisition） ---
             const [adBudget, setAdBudget] = useState(1000000); 
-            const [cpi, setCpi] = useState(500); // 1 to 100,000 JPY
+            const [cpi, setCpi] = useState(500); // 1円 〜 100,000円
 
-            // 2. Usage & Unit Costs (原価)
-            const [chatMins, setChatMins] = useState(10);
-            const [avatarCount, setAvatarCount] = useState(1);
-            const [contentCount, setContentCount] = useState(5);
-            const [liveMins, setLiveMins] = useState(5);
-            const [radioMins, setRadioMins] = useState(20);
+            // --- 2. 利用量（Usage）と指定原価 ---
+            const [chatMins, setChatMins] = useState(10);     // 会話: 60円/分
+            const [avatarCount, setAvatarCount] = useState(1); // アバター作成: 80円/体
+            const [contentCount, setContentCount] = useState(5); // コンテンツ生成: 120円/本
+            const [liveMins, setLiveMins] = useState(5);      // ライブ: 90円/分
+            const [radioMins, setRadioMins] = useState(20);    // ラジオ: 20円/分
 
-            // 3. Revenue streams (収益)
-            const [adRevPerUser, setAdRevPerUser] = useState(50);
-            const [creatorRevPerUser, setCreatorRevPerUser] = useState(100);
-            const [creatorCount, setCreatorCount] = useState(10);
-            const [badgePrice, setBadgePrice] = useState(1500);
-            const [badgeConv, setBadgeConv] = useState(2.5);
+            // --- 3. 収益源（Revenue） ---
+            const [adUnitPrice, setAdUnitPrice] = useState(50);      // 広告収益単価
+            const [creatorUnitPrice, setCreatorUnitPrice] = useState(100); // クリエイター単価
+            const [creatorCount, setCreatorCount] = useState(10);    // クリエイター数
+            const [badgeUnitPrice, setBadgeUnitPrice] = useState(1500); // 認証バッジ単価
+            const [badgeConvRate, setBadgeConvRate] = useState(2.5);  // バッジCV率
 
-            // Unit Costs Constants
-            const UNIT_COSTS = { chat: 60, avatar: 80, content: 120, live: 90, radio: 20 };
+            // 原価定数
+            const COST_PER_UNIT = { chat: 60, avatar: 80, content: 120, live: 90, radio: 20 };
 
             useEffect(() => {
                 if (window.lucide) window.lucide.createIcons();
             }, []);
 
             const metrics = useMemo(() => {
-                const users = Math.max(1, adBudget / cpi);
+                const totalUsers = Math.max(1, adBudget / cpi);
                 
-                // Costs calculation
-                const cChat = chatMins * UNIT_COSTS.chat;
-                const cAvatar = avatarCount * UNIT_COSTS.avatar;
-                const cContent = contentCount * UNIT_COSTS.content;
-                const cLive = liveMins * UNIT_COSTS.live;
-                const cRadio = radioMins * UNIT_COSTS.radio;
-                const costPerUser = cChat + cAvatar + cContent + cLive + cRadio;
-                const totalCogs = costPerUser * users;
+                // 機能別原価計算（ユーザー数 × 利用量 × 単価）
+                const cChat = chatMins * COST_PER_UNIT.chat * totalUsers;
+                const cAvatar = avatarCount * COST_PER_UNIT.avatar * totalUsers;
+                const cContent = contentCount * COST_PER_UNIT.content * totalUsers;
+                const cLive = liveMins * COST_PER_UNIT.live * totalUsers;
+                const cRadio = radioMins * COST_PER_UNIT.radio * totalUsers;
+                
+                const totalCogs = cChat + cAvatar + cContent + cLive + cRadio;
+                const varCostPerUser = totalCogs / totalUsers;
 
-                // Revenue calculation
-                const rAd = adRevPerUser * users;
-                const rCreator = creatorRevPerUser * users * creatorCount;
-                const rBadge = badgePrice * users * (badgeConv / 100);
-                const totalRev = rAd + rCreator + rBadge;
+                // 収益計算
+                const revAd = adUnitPrice * totalUsers;
+                const revCreator = creatorUnitPrice * totalUsers * creatorCount;
+                const revBadge = badgeUnitPrice * totalUsers * (badgeConvRate / 100);
+                const totalRevenue = revAd + revCreator + revBadge;
 
-                const profit = totalRev - totalCogs - adBudget;
+                const netProfit = totalRevenue - totalCogs - adBudget;
 
                 return {
-                    users, totalRev, totalCogs, profit, costPerUser,
-                    revBreakdown: [
-                        { name: '広告収益', value: rAd, color: '#6366f1' },
-                        { name: 'クリエイター', value: rCreator, color: '#8b5cf6' },
-                        { name: '認証バッジ', value: rBadge, color: '#ec4899' }
+                    totalUsers, totalRevenue, totalCogs, netProfit, varCostPerUser,
+                    revAd, revCreator, revBadge,
+                    costData: [
+                        { name: '会話', value: cChat, color: '#f43f5e' },
+                        { name: 'アバター', value: cAvatar, color: '#fb7185' },
+                        { name: 'コンテンツ', value: cContent, color: '#fda4af' },
+                        { name: 'ライブ', value: cLive, color: '#fecdd3' },
+                        { name: 'ラジオ', value: cRadio, color: '#94a3b8' }
                     ],
-                    costBreakdown: [
-                        { name: '会話', value: cChat * users },
-                        { name: 'アバター', value: cAvatar * users },
-                        { name: 'コンテンツ', value: cContent * users },
-                        { name: 'ライブ', value: cLive * users },
-                        { name: 'ラジオ', value: cRadio * users }
+                    revData: [
+                        { name: '広告収益', value: revAd, color: '#6366f1' },
+                        { name: 'クリエイター', value: revCreator, color: '#8b5cf6' },
+                        { name: '認証バッジ', value: revBadge, color: '#ec4899' }
                     ]
                 };
-            }, [adBudget, cpi, chatMins, avatarCount, contentCount, liveMins, radioMins, adRevPerUser, creatorRevPerUser, creatorCount, badgePrice, badgeConv]);
+            }, [adBudget, cpi, chatMins, avatarCount, contentCount, liveMins, radioMins, adUnitPrice, creatorUnitPrice, creatorCount, badgeUnitPrice, badgeConvRate]);
 
-            const formatCurrency = (v) => "¥" + Math.floor(v).toLocaleString();
+            const formatYen = (v) => "¥" + Math.floor(v).toLocaleString();
 
             return (
-                <div className="min-h-screen p-4 md:p-8">
+                <div className="min-h-screen p-4 md:p-8 bg-slate-50">
                     <header className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="bg-indigo-600 p-2 rounded-lg text-white">
-                                <i data-lucide="line-chart" className="w-6 h-6"></i>
+                            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-200">
+                                <i data-lucide="bar-chart-3" className="w-6 h-6"></i>
                             </div>
-                            <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase">Twomi Simulator v10</h1>
-                        </div>
-                        <div className="bg-white px-4 py-2 rounded-full border border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            Strategic P&L Dashboard
+                            <h1 className="text-xl font-black tracking-tight text-slate-800">TWOMI SIMULATOR v11</h1>
                         </div>
                     </header>
 
                     <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        {/* Settings Column */}
+                        {/* 設定エリア */}
                         <div className="lg:col-span-4 space-y-6">
-                            {/* Acquisition */}
-                            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                    <i data-lucide="users" className="w-3 h-3"></i> ユーザー獲得
+                            <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <i data-lucide="target" className="w-3 h-3 text-indigo-500"></i> ユーザー獲得
                                 </h2>
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <div className="flex justify-between text-xs font-bold"><span>広告予算</span><span>{formatCurrency(adBudget)}</span></div>
-                                        <input type="range" min="100000" max="50000000" step="100000" value={adBudget} onChange={e => setAdBudget(Number(e.target.value))} className="w-full" />
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>広告予算</span><span>{formatYen(adBudget)}</span></div>
+                                        <input type="range" min="100000" max="50000000" step="100000" value={adBudget} onChange={e => setAdBudget(Number(e.target.value))} />
                                     </div>
                                     <div className="space-y-2">
-                                        <div className="flex justify-between text-xs font-bold"><span>CPI (獲得単価)</span><span className="text-rose-500">{formatCurrency(cpi)}</span></div>
-                                        <input type="range" min="1" max="100000" step="1" value={cpi} onChange={e => setCpi(Number(e.target.value))} className="w-full" />
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>CPI (獲得単価)</span><span className="text-rose-500">{formatYen(cpi)}</span></div>
+                                        <input type="range" min="1" max="100000" step="1" value={cpi} onChange={e => setCpi(Number(e.target.value))} />
                                     </div>
-                                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase">獲得ユーザー数</span>
-                                        <span className="text-lg font-black text-indigo-600">{Math.floor(metrics.users).toLocaleString()} 人</span>
+                                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
+                                        <span>獲得ユーザー数</span>
+                                        <span className="text-lg font-black text-indigo-600">{Math.floor(metrics.totalUsers).toLocaleString()} 人</span>
                                     </div>
                                 </div>
                             </section>
 
-                            {/* Costs */}
-                            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                    <i data-lucide="cpu" className="w-3 h-3"></i> 機能別利用量 (原価計算)
+                            <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <i data-lucide="cpu" className="w-3 h-3 text-rose-500"></i> 機能別利用量（原価）
                                 </h2>
                                 <div className="space-y-4">
                                     {[
@@ -148,141 +146,133 @@
                                         { label: "ラジオ配信 (分/月)", val: radioMins, set: setRadioMins, max: 600 }
                                     ].map((item, i) => (
                                         <div key={i} className="space-y-1">
-                                            <div className="flex justify-between text-[10px] font-bold text-slate-500"><span>{item.label}</span><span>{item.val}</span></div>
-                                            <input type="range" min="0" max={item.max} value={item.val} onChange={e => item.set(Number(e.target.value))} className="w-full" />
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase"><span>{item.label}</span><span>{item.val}</span></div>
+                                            <input type="range" min="0" max={item.max} value={item.val} onChange={e => item.set(Number(e.target.value))} />
                                         </div>
                                     ))}
                                 </div>
                             </section>
 
-                            {/* Revenue */}
-                            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                    <i data-lucide="banknote" className="w-3 h-3"></i> 収益ロジック
+                            <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <i data-lucide="banknote" className="w-3 h-3 text-emerald-500"></i> 収益ロジック設定
                                 </h2>
                                 <div className="space-y-4">
                                     <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px] font-bold"><span>広告収益 / ユーザー</span><span>¥{adRevPerUser}</span></div>
-                                        <input type="range" min="0" max="1000" step="10" value={adRevPerUser} onChange={e => setAdRevPerUser(Number(e.target.value))} />
+                                        <div className="flex justify-between text-[10px] font-bold text-slate-500"><span>広告単価 / ユーザー</span><span>¥{adUnitPrice}</span></div>
+                                        <input type="range" min="0" max="1000" step="10" value={adUnitPrice} onChange={e => setAdUnitPrice(Number(e.target.value))} />
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px] font-bold"><span>クリエイター収益単価</span><span>¥{creatorRevPerUser}</span></div>
-                                        <input type="range" min="0" max="2000" step="50" value={creatorRevPerUser} onChange={e => setCreatorRevPerUser(Number(e.target.value))} />
+                                        <div className="flex justify-between text-[10px] font-bold text-slate-500"><span>クリエイター単価</span><span>¥{creatorUnitPrice}</span></div>
+                                        <input type="range" min="0" max="2000" step="50" value={creatorUnitPrice} onChange={e => setCreatorUnitPrice(Number(e.target.value))} />
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px] font-bold"><span>クリエイター数</span><span>{creatorCount}人</span></div>
-                                        <input type="range" min="1" max="100" value={creatorCount} onChange={e => setCreatorCount(Number(e.target.value))} />
+                                        <div className="flex justify-between text-[10px] font-bold text-slate-500"><span>クリエイター数</span><span>{creatorCount}人</span></div>
+                                        <input type="range" min="1" max={100} value={creatorCount} onChange={e => setCreatorCount(Number(e.target.value))} />
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px] font-bold"><span>認証バッジ単価</span><span>¥{badgePrice}</span></div>
-                                        <input type="range" min="500" max="10000" step="100" value={badgePrice} onChange={e => setBadgePrice(Number(e.target.value))} />
+                                        <div className="flex justify-between text-[10px] font-bold text-slate-500"><span>バッジ単価</span><span>¥{badgeUnitPrice}</span></div>
+                                        <input type="range" min="500" max="10000" step="100" value={badgeUnitPrice} onChange={e => setBadgeUnitPrice(Number(e.target.value))} />
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px] font-bold"><span>バッジ転換率</span><span>{badgeConv}%</span></div>
-                                        <input type="range" min="0.1" max="30" step="0.1" value={badgeConv} onChange={e => setBadgeConv(Number(e.target.value))} />
+                                        <div className="flex justify-between text-[10px] font-bold text-slate-500"><span>バッジ転換率</span><span>{badgeConvRate}%</span></div>
+                                        <input type="range" min="0.1" max="30" step="0.1" value={badgeConvRate} onChange={e => setBadgeConvRate(Number(e.target.value))} />
                                     </div>
                                 </div>
                             </section>
                         </div>
 
-                        {/* Result Column */}
+                        {/* 分析結果エリア */}
                         <div className="lg:col-span-8 space-y-6">
-                            {/* Scoreboard */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className={`p-6 rounded-3xl shadow-sm border-l-8 ${metrics.profit > 0 ? 'bg-emerald-50 border-emerald-500 text-emerald-900' : 'bg-rose-50 border-rose-500 text-rose-900'}`}>
+                                <div className={`p-6 rounded-[2rem] shadow-sm border-l-8 ${metrics.netProfit > 0 ? 'bg-emerald-50 border-emerald-500 text-emerald-900' : 'bg-rose-50 border-rose-500 text-rose-900'}`}>
                                     <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">月間営業利益</p>
-                                    <p className="text-3xl font-black">{formatCurrency(metrics.profit)}</p>
+                                    <p className="text-2xl font-black">{formatYen(metrics.netProfit)}</p>
                                 </div>
-                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">月間総収益</p>
-                                    <p className="text-3xl font-black text-slate-800">{formatCurrency(metrics.totalRev)}</p>
+                                    <p className="text-2xl font-black text-slate-800">{formatYen(metrics.totalRevenue)}</p>
                                 </div>
-                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">総原価(AI+獲得)</p>
-                                    <p className="text-3xl font-black text-slate-800">{formatCurrency(metrics.totalCogs + adBudget)}</p>
+                                <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">総原価(AI+広告費)</p>
+                                    <p className="text-2xl font-black text-slate-800">{formatYen(metrics.totalCogs + adBudget)}</p>
                                 </div>
                             </div>
 
-                            {/* Charts */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">収益内訳</h3>
+                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">収益構成比率</h3>
                                     <div className="h-64">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={metrics.revBreakdown} layout="vertical">
+                                            <BarChart data={metrics.revData} layout="vertical" margin={{ left: 20 }}>
                                                 <XAxis type="number" hide />
                                                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} width={80} />
-                                                <Tooltip formatter={v => formatCurrency(v)} />
-                                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={30}>
-                                                    {metrics.revBreakdown.map((entry, index) => (
+                                                <Tooltip formatter={v => formatYen(v)} cursor={{fill: '#f8fafc'}} />
+                                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={25}>
+                                                    {metrics.revData.map((entry, index) => (
                                                         <Cell key={index} fill={entry.color} />
                                                     ))}
                                                 </Bar>
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>
-                                </div>
+                                </section>
 
-                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">機能別原価比率</h3>
+                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 text-center">機能別原価内訳</h3>
                                     <div className="h-64">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
-                                                <Pie data={metrics.costBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5}>
-                                                    <Cell fill="#f43f5e" />
-                                                    <Cell fill="#fb7185" />
-                                                    <Cell fill="#fda4af" />
-                                                    <Cell fill="#fecdd3" />
-                                                    <Cell fill="#94a3b8" />
+                                                <Pie data={metrics.costData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4}>
+                                                    {metrics.costData.map((entry, index) => (
+                                                        <Cell key={index} fill={entry.color} />
+                                                    ))}
                                                 </Pie>
-                                                <Tooltip formatter={v => formatCurrency(v)} />
+                                                <Tooltip formatter={v => formatYen(v)} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
-                                    <div className="flex flex-wrap justify-center gap-2 mt-2">
-                                        {metrics.costBreakdown.map((c, i) => (
-                                            <span key={i} className="text-[8px] font-bold text-slate-400 flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: ['#f43f5e','#fb7185','#fda4af','#fecdd3','#94a3b8'][i]}}></span>
-                                                {c.name}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
+                                </section>
                             </div>
 
-                            {/* Strategic Insight */}
-                            <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
-                                <div className="flex items-center gap-3 mb-6 text-amber-400">
+                            <section className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
+                                <div className="flex items-center gap-3 mb-8 text-amber-400">
                                     <i data-lucide="zap" className="w-5 h-5"></i>
-                                    <h3 className="text-xs font-black uppercase tracking-[0.2em]">Unit Economics Insight</h3>
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em]">Strategic Unit Economics</h3>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
                                     <div>
                                         <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">ARPU (月間単価)</p>
-                                        <p className="text-xl font-black">¥{Math.floor(metrics.totalRev / metrics.users).toLocaleString()}</p>
+                                        <p className="text-xl font-black">¥{Math.floor(metrics.totalRevenue / metrics.totalUsers).toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">COGS / User</p>
-                                        <p className="text-xl font-black text-rose-400">¥{Math.floor(metrics.costPerUser).toLocaleString()}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">AI原価 / ユーザー</p>
+                                        <p className="text-xl font-black text-rose-400">¥{Math.floor(metrics.varCostPerUser).toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">限界利益 / 人</p>
-                                        <p className="text-xl font-black text-emerald-400">¥{Math.floor(metrics.totalRev / metrics.users - metrics.costPerUser).toLocaleString()}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">限界利益 / ユーザー</p>
+                                        <p className="text-xl font-black text-emerald-400">¥{Math.floor((metrics.totalRevenue / metrics.totalUsers) - metrics.varCostPerUser).toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">最大許容CPI</p>
-                                        <p className="text-xl font-black text-amber-400">¥{Math.floor(metrics.totalRev / metrics.users - metrics.costPerUser).toLocaleString()}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">損益分岐CPI (上限)</p>
+                                        <p className="text-xl font-black text-amber-400">¥{Math.floor(metrics.totalRevenue / metrics.totalUsers - metrics.varCostPerUser).toLocaleString()}</p>
                                     </div>
                                 </div>
-                            </div>
+                            </section>
                         </div>
                     </main>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // DOMの読み込み完了を待ってから実行
+        window.addEventListener('load', () => {
+            const rootElement = document.getElementById('root');
+            if (rootElement) {
+                const root = ReactDOM.createRoot(rootElement);
+                root.render(<App />);
+            }
+        });
     </script>
 </body>
 
