@@ -1,63 +1,341 @@
-import React, { useState } from 'react';
-import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Bar } from 'recharts';
-import 'tailwindcss/tailwind.css';
+<!DOCTYPE html>
+<html lang="ja">
 
-const MyDashboard = () => {
-  const [userCount, setUserCount] = useState(500000);
-  const [cpi, setCpi] = useState(50000);
-  const creatorCount = 5;
-  const paidConversionRate = 0.1; // 10%
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar Strategic Dashboard - P&L Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        input[type='range'] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type='range']::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #e2e8f0; border-radius: 10px; }
+        input[type='range']::-webkit-slider-thumb { height: 18px; width: 18px; border-radius: 50%; background: #4f46e5; cursor: pointer; -webkit-appearance: none; margin-top: -6px; border: 2px solid #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .kpi-card { transition: all 0.2s; border: 1px solid rgba(226, 232, 240, 0.8); }
+        .kpi-card:hover { border-color: #4f46e5; transform: translateY(-2px); }
+    </style>
+</head>
 
-  const costs = {
-    chat: 60,  // yen/min
-    avatarCreation: 80,
-    contentGeneration: 120,
-    liveStreaming: 90,
-    radio: 20,
-  };
+<body>
+    <div id="root"></div>
 
-  const totalCost = (usageTime) => {
-    return (costs.chat * usageTime) + 
-           (costs.avatarCreation * userCount) + 
-           (costs.contentGeneration * userCount) + 
-           (costs.liveStreaming * usageTime) + 
-           (costs.radio * usageTime);
-  };
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, AreaChart, Area, Legend, ComposedChart, Line } = Recharts;
 
-  const creatorRevenue = (userCount * creatorCount) * 1000; // unit price of 1000 yen
-  const advertisingRevenue = userCount * cpi;
-  const authBadgeRevenue = userCount * paidConversionRate * 500; // unit price of 500 yen
+        const IconInit = () => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+            return null;
+        };
 
-  const data = [
-    { name: 'Costs', value: totalCost(60) },  // assuming 60 minutes of usage
-    { name: 'Creator Revenue', value: creatorRevenue },
-    { name: 'Advertising Revenue', value: advertisingRevenue },
-    { name: 'Auth Badge Revenue', value: authBadgeRevenue }
-  ];
+        const Card = ({ children, className = "" }) => (
+            <div className={`bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-200 ${className}`}>
+                {children}
+            </div>
+        );
 
-  return (
-    <div className="flex h-screen bg-gray-100">
-      <div className="w-1/4 bg-white p-5 shadow-md">
-        <h2 className="text-xl font-bold">Settings</h2>
-        <label className="block mt-4">User Count (1 - 1,000,000):</label>
-        <input type="range" min="1" max="1000000" value={userCount} onChange={(e) => setUserCount(e.target.value)} className="slider w-full"/>
+        const InputHeader = ({ icon, title, color }) => (
+            <div className="flex items-center gap-2 mb-4 mt-6 first:mt-0">
+                <div className={`p-1.5 rounded-lg ${color}`}>
+                    <i data-lucide={icon} className="w-3.5 h-3.5"></i>
+                </div>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">{title}</h4>
+            </div>
+        );
 
-        <label className="block mt-4">CPI (1 - 100,000 yen):</label>
-        <input type="range" min="1" max="100000" value={cpi} onChange={(e) => setCpi(e.target.value)} className="slider w-full"/>
-      </div>
-      <div className="flex-grow p-5">
-        <h2 className="text-xl font-bold">Cost Structure</h2>
-        <BarChart width={600} height={300} data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="value" fill="#8884d8" />
-        </BarChart>
-      </div>
-    </div>
-  );
-};
+        const App = () => {
+            const [isJpy, setIsJpy] = useState(true);
+            const exchangeRate = 155;
 
-export default MyDashboard;
+            // --- Constants from Cost Sheet (USD) ---
+            const UNIT_COSTS = {
+                chatMin: 0.40,      // $0.40 per minute
+                videoPerGen: 0.40,  // $0.40 per generation
+                liveMin: 0.60,      // $0.60 per minute
+                hostingUnit: 5000,   // $5,000 per 5 concurrent users
+                hostingStep: 5       // Change cost every 5 users
+            };
+
+            // --- State Variables ---
+            const [adBudget, setAdBudget] = useState(50000);
+            const [cpi, setCpi] = useState(1.2);
+            const [infFollowers, setInfFollowers] = useState(1000000);
+            const [payConvRate, setPayConvRate] = useState(5.0);
+            const [arpuPaid, setArpuPaid] = useState(30);
+            const [retentionMonths, setRetentionMonths] = useState(6);
+            
+            // Usage Frequency (Per User / Per Month)
+            const [chatMins, setChatMins] = useState(30);   // minutes
+            const [videoGens, setVideoGens] = useState(10); // times
+            const [liveMins, setLiveMins] = useState(10);   // minutes
+
+            // Server Concurrency (System parameter)
+            const [concurrencyRate, setConcurrencyRate] = useState(1.0); // 1.0% of users are concurrent at peak
+
+            const formatVal = (val, isCurrency = true, compact = false) => {
+                const actualVal = isCurrency ? (isJpy ? val * exchangeRate : val) : val;
+                if (compact) {
+                    return new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1, style: isCurrency ? 'currency' : 'decimal', currency: isJpy ? 'JPY' : 'USD' }).format(actualVal);
+                }
+                return isCurrency
+                    ? (isJpy ? '¥' : '$') + new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(actualVal)
+                    : new Intl.NumberFormat('ja-JP').format(Math.floor(val));
+            };
+
+            const metrics = useMemo(() => {
+                // Acquisition
+                const paidInstalls = adBudget / cpi;
+                const viralInstalls = (paidInstalls + (infFollowers * 0.01)) * 0.2;
+                const totalMAU = paidInstalls + viralInstalls;
+                const payingUsers = totalMAU * (payConvRate / 100);
+
+                // Revenue
+                const monthlyRev = payingUsers * arpuPaid;
+                
+                // --- Variable COGS (Per User usage) ---
+                const varCostPerUser = 
+                    (chatMins * UNIT_COSTS.chatMin) + 
+                    (videoGens * UNIT_COSTS.videoPerGen) + 
+                    (liveMins * UNIT_COSTS.liveMin);
+                
+                const totalVariableCogs = payingUsers * varCostPerUser;
+
+                // --- Dynamic Hosting Cost (Step based on concurrency) ---
+                // Concurrent Users based on MAU at peak
+                const concurrentUsers = Math.max(1, totalMAU * (concurrencyRate / 100));
+                const hostingUnits = Math.ceil(concurrentUsers / UNIT_COSTS.hostingStep);
+                const totalHostingCost = hostingUnits * UNIT_COSTS.hostingUnit;
+                
+                const totalCogs = totalVariableCogs + totalHostingCost;
+                
+                // Profitability
+                const grossProfit = monthlyRev - totalCogs;
+                const monthlyNetProfit = grossProfit - adBudget;
+                const annualNetProfit = monthlyNetProfit * 12;
+
+                // Unit Economics
+                const cac = adBudget / (totalMAU || 1);
+                const ltv = (arpuPaid - varCostPerUser) * retentionMonths;
+                const ltvCacRatio = ltv / (cac || 1);
+
+                return {
+                    totalMAU, payingUsers, monthlyRev, totalCogs, monthlyNetProfit, annualNetProfit,
+                    cac, ltv, ltvCacRatio, varCostPerUser, concurrentUsers, totalHostingCost,
+                    plData: [
+                        { name: '売上', value: monthlyRev, color: '#4f46e5' },
+                        { name: 'AI利用原価', value: totalVariableCogs, color: '#f43f5e' },
+                        { name: 'ホスティング', value: totalHostingCost, color: '#fb7185' },
+                        { name: '広告費', value: adBudget, color: '#94a3b8' },
+                        { name: '営業利益', value: monthlyNetProfit, color: monthlyNetProfit > 0 ? '#10b981' : '#f43f5e' }
+                    ],
+                    costBreakdown: [
+                        { name: 'Chat(分)', value: chatMins * UNIT_COSTS.chatMin * payingUsers },
+                        { name: 'Video(回)', value: videoGens * UNIT_COSTS.videoPerGen * payingUsers },
+                        { name: 'Live(分)', value: liveMins * UNIT_COSTS.liveMin * payingUsers },
+                        { name: 'Hosting', value: totalHostingCost }
+                    ]
+                };
+            }, [adBudget, cpi, infFollowers, payConvRate, arpuPaid, chatMins, videoGens, liveMins, retentionMonths, concurrencyRate]);
+
+            return (
+                <div className="min-h-screen pb-12">
+                    <IconInit />
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                                    <i data-lucide="bar-chart-3" className="text-white w-5 h-5"></i>
+                                </div>
+                                <h1 className="font-black text-slate-800 tracking-tight">AI AVATAR P&L SIMULATOR <span className="text-indigo-600 ml-2">v8.0</span></h1>
+                            </div>
+                            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                                <button onClick={() => setIsJpy(false)} className={`px-4 py-1.5 rounded-md text-xs font-bold ${!isJpy ? 'bg-white shadow-sm' : 'text-slate-500'}`}>USD</button>
+                                <button onClick={() => setIsJpy(true)} className={`px-4 py-1.5 rounded-md text-xs font-bold ${isJpy ? 'bg-white shadow-sm' : 'text-slate-500'}`}>JPY</button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-7xl mx-auto px-6 pt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        
+                        {/* Sidebar */}
+                        <div className="lg:col-span-4 space-y-6">
+                            <Card className="border-indigo-100">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6">Simulation Controls</h3>
+
+                                <InputHeader icon="megaphone" title="マーケティング獲得" color="bg-indigo-50 text-indigo-600" />
+                                <div className="space-y-4 mb-8">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold"><span>月間広告予算</span><span className="text-indigo-600">{formatVal(adBudget)}</span></div>
+                                        <input type="range" min="1000" max="200000" step="1000" value={adBudget} onChange={e => setAdBudget(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold"><span>CPI (獲得単価)</span><span className="text-indigo-600">{formatVal(cpi)}</span></div>
+                                        <input type="range" min="0.5" max="5" step="0.1" value={cpi} onChange={e => setCpi(Number(e.target.value))} />
+                                    </div>
+                                </div>
+
+                                <InputHeader icon="cpu" title="AI利用・負荷設定" color="bg-rose-50 text-rose-600" />
+                                <div className="space-y-4 mb-8 p-4 bg-rose-50/30 rounded-2xl border border-rose-100">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>Chat利用時間 (分/月)</span><span>{chatMins}分</span></div>
+                                        <input type="range" min="0" max="300" step="10" value={chatMins} onChange={e => setChatMins(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>Video生成回数 (回/月)</span><span>{videoGens}回</span></div>
+                                        <input type="range" min="0" max="100" step="5" value={videoGens} onChange={e => setVideoGens(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>Live配信時間 (分/月)</span><span>{liveMins}分</span></div>
+                                        <input type="range" min="0" max="300" step="10" value={liveMins} onChange={e => setLiveMins(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-2 pt-2 border-t border-rose-100">
+                                        <div className="flex justify-between text-[10px] font-bold text-rose-700 uppercase"><span>同時接続率 (ピーク時)</span><span>{concurrencyRate.toFixed(1)}%</span></div>
+                                        <input type="range" min="0.1" max="10" step="0.1" value={concurrencyRate} onChange={e => setConcurrencyRate(Number(e.target.value))} />
+                                        <p className="text-[9px] text-rose-400 mt-1 italic">※5名ごとに{formatVal(UNIT_COSTS.hostingUnit)}加算</p>
+                                    </div>
+                                </div>
+
+                                <InputHeader icon="wallet" title="マネタイズ戦略" color="bg-emerald-50 text-emerald-600" />
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold"><span>課金転換率</span><span className="text-emerald-600">{payConvRate}%</span></div>
+                                        <input type="range" min="1" max="30" step="0.5" value={payConvRate} onChange={e => setPayConvRate(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold"><span>ARPU (月額単価)</span><span className="text-emerald-600">{formatVal(arpuPaid)}</span></div>
+                                        <input type="range" min="5" max="200" step="5" value={arpuPaid} onChange={e => setArpuPaid(Number(e.target.value))} />
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+
+                        {/* Analysis Area */}
+                        <div className="lg:col-span-8 space-y-6">
+                            
+                            {/* Scorecards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <Card className={`p-6 border-l-4 ${metrics.monthlyNetProfit > 0 ? 'border-emerald-500' : 'border-rose-500'}`}>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">月間予測利益 (Net Profit)</p>
+                                    <h2 className={`text-2xl font-black ${metrics.monthlyNetProfit > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {formatVal(metrics.monthlyNetProfit)}
+                                    </h2>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-2">ROI: {((metrics.monthlyNetProfit / adBudget) * 100).toFixed(0)}%</p>
+                                </Card>
+                                <Card className="p-6 border-l-4 border-indigo-500">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">同時接続数 / サーバー費用</p>
+                                    <h2 className="text-2xl font-black text-indigo-600">
+                                        {Math.ceil(metrics.concurrentUsers)}人 / {formatVal(metrics.totalHostingCost, true, true)}
+                                    </h2>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-2">MAU: {formatVal(metrics.totalMAU, false)}人</p>
+                                </Card>
+                                <Card className="p-6 border-l-4 border-slate-800">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">LTV / CAC Ratio</p>
+                                    <h2 className={`text-2xl font-black ${metrics.ltvCacRatio > 3 ? 'text-emerald-600' : 'text-amber-500'}`}>
+                                        {metrics.ltvCacRatio.toFixed(2)}x
+                                    </h2>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-2">CAC: {formatVal(metrics.cac)} / LTV: {formatVal(metrics.ltv)}</p>
+                                </Card>
+                            </div>
+
+                            {/* P&L Analysis Chart */}
+                            <Card className="p-8">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
+                                    <i data-lucide="activity" className="w-4 h-4"></i> コスト構造・収益性インパクト
+                                </h4>
+                                <div className="h-72">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={metrics.plData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 700}} />
+                                            <YAxis hide />
+                                            <RechartsTooltip cursor={{fill: '#f8fafc'}} formatter={(v) => formatVal(v)} />
+                                            <Bar dataKey="value" radius={[8, 8, 8, 8]} barSize={55}>
+                                                {metrics.plData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </Card>
+
+                            {/* Cost Structure Insight */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <Card className="p-8">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">変動費・固定費 内訳</h4>
+                                    <div className="h-48">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={metrics.costBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={5}>
+                                                    <Cell fill="#f43f5e" />
+                                                    <Cell fill="#fb7185" />
+                                                    <Cell fill="#fda4af" />
+                                                    <Cell fill="#94a3b8" />
+                                                </Pie>
+                                                <RechartsTooltip formatter={(v) => formatVal(v)} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="space-y-2 mt-4">
+                                        {metrics.costBreakdown.map((c, i) => (
+                                            <div key={i} className="flex justify-between items-center text-[10px] font-bold">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: ['#f43f5e', '#fb7185', '#fda4af', '#94a3b8'][i]}}></div>
+                                                    <span className="text-slate-500 uppercase">{c.name}</span>
+                                                </div>
+                                                <span className="text-slate-800">{formatVal(c.value, true, true)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+
+                                <Card className="p-8 bg-slate-900 text-white border-none">
+                                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 italic flex items-center gap-2">
+                                        <i data-lucide="zap" className="w-4 h-4 text-amber-400"></i> Unit Economics Insight
+                                    </h4>
+                                    <div className="space-y-6">
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                            <p className="text-[10px] text-slate-400 uppercase mb-1">1会員あたりの月間AIコスト</p>
+                                            <p className="text-xl font-black text-white">{formatVal(metrics.varCostPerUser)}</p>
+                                            <p className="text-[9px] text-slate-500 mt-1 italic">※ARPUに対して占有率: {((metrics.varCostPerUser / arpuPaid) * 100).toFixed(1)}%</p>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase">損益分岐点 (会員)</span>
+                                                <span className="text-lg font-black">{formatVal((adBudget + metrics.totalHostingCost) / (arpuPaid - metrics.varCostPerUser), false)}人</span>
+                                            </div>
+                                            <p className="text-[10px] leading-relaxed text-slate-400">
+                                                ホスティングコストは同時接続 <span className="text-indigo-400 font-black">{Math.ceil(metrics.concurrentUsers)}名</span> に対して
+                                                <span className="text-white font-black">{formatVal(metrics.totalHostingCost)}</span> 発生しています。
+                                                ユーザー数が増えると階段状にコストが上昇するため、同時接続率の最適化が利益の鍵となります。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+
+                        </div>
+                    </main>
+
+                    <footer className="max-w-7xl mx-auto px-6 mt-16 py-8 border-t border-slate-200 text-center">
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em]">Twomi Strategic Simulator v8.0 - Dynamic Scaling Update</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
