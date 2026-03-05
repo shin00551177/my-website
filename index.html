@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twomi Business Strategy Simulator</title>
+    <title>AI Avatar Strategy & P&L Simulator</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Dependencies -->
@@ -19,7 +19,6 @@
         input[type='range'] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type='range']::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #e2e8f0; border-radius: 10px; }
         input[type='range']::-webkit-slider-thumb { height: 18px; width: 18px; border-radius: 50%; background: #4f46e5; cursor: pointer; -webkit-appearance: none; margin-top: -6px; border: 2px solid #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        .card-shadow { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); }
     </style>
 </head>
 
@@ -27,239 +26,255 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // ライブラリの存在を確認してからコンポーネントを定義
         const { useState, useMemo, useEffect } = React;
 
-        const Card = ({ children, className = "" }) => (
-            <div className={`bg-white rounded-[1.25rem] p-6 card-shadow border border-slate-200 ${className}`}>
-                {children}
-            </div>
-        );
-
-        const SliderGroup = ({ label, value, min, max, step, onChange, unit = "", colorClass = "text-indigo-600" }) => (
-            <div className="space-y-2 mb-4">
-                <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-                    <span className={`text-xs font-black ${colorClass}`}>{value.toLocaleString()}{unit}</span>
-                </div>
-                <input 
-                    type="range" 
-                    min={min} 
-                    max={max} 
-                    step={step} 
-                    value={value} 
-                    onChange={(e) => onChange(Number(e.target.value))} 
-                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                />
-            </div>
-        );
-
         const App = () => {
-            // Rechartsのコンポーネントをコンポーネント内で取得（安全策）
-            const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } = window.Recharts;
+            // Recharts components from window
+            const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } = window.Recharts;
 
-            // アイコンの初期化
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }, []); // 初回のみ実行
-
-            // --- 1. Acquisition (獲得) ---
+            // 1. Acquisition (獲得)
             const [adBudget, setAdBudget] = useState(1000000); 
-            const [cpi, setCpi] = useState(500); 
+            const [cpi, setCpi] = useState(500); // 1 to 100,000 JPY
 
-            // --- 2. Usage (利用量) ---
+            // 2. Usage & Unit Costs (原価)
             const [chatMins, setChatMins] = useState(10);
             const [avatarCount, setAvatarCount] = useState(1);
             const [contentCount, setContentCount] = useState(5);
             const [liveMins, setLiveMins] = useState(5);
             const [radioMins, setRadioMins] = useState(20);
 
-            // --- 3. Revenue (収益設定) ---
-            const [adUnitPrice, setAdUnitPrice] = useState(50);
-            const [creatorUnitPrice, setCreatorUnitPrice] = useState(100);
+            // 3. Revenue streams (収益)
+            const [adRevPerUser, setAdRevPerUser] = useState(50);
+            const [creatorRevPerUser, setCreatorRevPerUser] = useState(100);
             const [creatorCount, setCreatorCount] = useState(10);
-            const [badgeUnitPrice, setBadgeUnitPrice] = useState(1500);
-            const [badgeConvRate, setBadgeConvRate] = useState(2.5);
+            const [badgePrice, setBadgePrice] = useState(1500);
+            const [badgeConv, setBadgeConv] = useState(2.5);
 
-            const COSTS = { chat: 60, avatar: 80, content: 120, live: 90, radio: 20 };
+            // Unit Costs Constants
+            const UNIT_COSTS = { chat: 60, avatar: 80, content: 120, live: 90, radio: 20 };
+
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, []);
 
             const metrics = useMemo(() => {
-                const totalUsers = Math.max(1, adBudget / cpi);
-                const costChat = chatMins * COSTS.chat;
-                const costAvatar = avatarCount * COSTS.avatar;
-                const costContent = contentCount * COSTS.content;
-                const costLive = liveMins * COSTS.live;
-                const costRadio = radioMins * COSTS.radio;
+                const users = Math.max(1, adBudget / cpi);
                 
-                const varCostPerUser = costChat + costAvatar + costContent + costLive + costRadio;
-                const totalCogs = varCostPerUser * totalUsers;
+                // Costs calculation
+                const cChat = chatMins * UNIT_COSTS.chat;
+                const cAvatar = avatarCount * UNIT_COSTS.avatar;
+                const cContent = contentCount * UNIT_COSTS.content;
+                const cLive = liveMins * UNIT_COSTS.live;
+                const cRadio = radioMins * UNIT_COSTS.radio;
+                const costPerUser = cChat + cAvatar + cContent + cLive + cRadio;
+                const totalCogs = costPerUser * users;
 
-                const revAd = adUnitPrice * totalUsers;
-                const revCreator = creatorUnitPrice * totalUsers * creatorCount;
-                const revBadge = badgeUnitPrice * totalUsers * (badgeConvRate / 100);
-                const totalRevenue = revAd + revCreator + revBadge;
+                // Revenue calculation
+                const rAd = adRevPerUser * users;
+                const rCreator = creatorRevPerUser * users * creatorCount;
+                const rBadge = badgePrice * users * (badgeConv / 100);
+                const totalRev = rAd + rCreator + rBadge;
 
-                const netProfit = totalRevenue - totalCogs - adBudget;
+                const profit = totalRev - totalCogs - adBudget;
 
                 return {
-                    totalUsers, totalRevenue, totalCogs, netProfit, varCostPerUser,
-                    costData: [
-                        { name: '会話', value: costChat * totalUsers },
-                        { name: 'アバター', value: costAvatar * totalUsers },
-                        { name: 'コンテンツ', value: costContent * totalUsers },
-                        { name: 'ライブ', value: costLive * totalUsers },
-                        { name: 'ラジオ', value: costRadio * totalUsers }
+                    users, totalRev, totalCogs, profit, costPerUser,
+                    revBreakdown: [
+                        { name: '広告収益', value: rAd, color: '#6366f1' },
+                        { name: 'クリエイター', value: rCreator, color: '#8b5cf6' },
+                        { name: '認証バッジ', value: rBadge, color: '#ec4899' }
                     ],
-                    revData: [
-                        { name: '広告収益', value: revAd, color: '#6366f1' },
-                        { name: 'クリエイター', value: revCreator, color: '#8b5cf6' },
-                        { name: '認証バッジ', value: revBadge, color: '#ec4899' }
+                    costBreakdown: [
+                        { name: '会話', value: cChat * users },
+                        { name: 'アバター', value: cAvatar * users },
+                        { name: 'コンテンツ', value: cContent * users },
+                        { name: 'ライブ', value: cLive * users },
+                        { name: 'ラジオ', value: cRadio * users }
                     ]
                 };
-            }, [adBudget, cpi, chatMins, avatarCount, contentCount, liveMins, radioMins, adUnitPrice, creatorUnitPrice, creatorCount, badgeUnitPrice, badgeConvRate]);
+            }, [adBudget, cpi, chatMins, avatarCount, contentCount, liveMins, radioMins, adRevPerUser, creatorRevPerUser, creatorCount, badgePrice, badgeConv]);
+
+            const formatCurrency = (v) => "¥" + Math.floor(v).toLocaleString();
 
             return (
-                <div className="min-h-screen bg-slate-50 pb-20">
-                    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-                        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                                    <i data-lucide="cpu" className="text-white w-5 h-5"></i>
-                                </div>
-                                <h1 className="font-black text-slate-800 text-lg tracking-tight">TWOMI P&L SIMULATOR</h1>
+                <div className="min-h-screen p-4 md:p-8">
+                    <header className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-indigo-600 p-2 rounded-lg text-white">
+                                <i data-lucide="line-chart" className="w-6 h-6"></i>
                             </div>
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Deploy Ready v9.1</div>
+                            <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase">Twomi Simulator v10</h1>
+                        </div>
+                        <div className="bg-white px-4 py-2 rounded-full border border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            Strategic P&L Dashboard
                         </div>
                     </header>
 
-                    <main className="max-w-7xl mx-auto px-6 pt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        {/* 左パネル */}
+                    <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* Settings Column */}
                         <div className="lg:col-span-4 space-y-6">
-                            <Card>
-                                <div className="flex items-center gap-2 mb-6">
-                                    <i data-lucide="target" className="w-4 h-4 text-indigo-600"></i>
-                                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">ユーザー獲得</h3>
+                            {/* Acquisition */}
+                            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <i data-lucide="users" className="w-3 h-3"></i> ユーザー獲得
+                                </h2>
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold"><span>広告予算</span><span>{formatCurrency(adBudget)}</span></div>
+                                        <input type="range" min="100000" max="50000000" step="100000" value={adBudget} onChange={e => setAdBudget(Number(e.target.value))} className="w-full" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold"><span>CPI (獲得単価)</span><span className="text-rose-500">{formatCurrency(cpi)}</span></div>
+                                        <input type="range" min="1" max="100000" step="1" value={cpi} onChange={e => setCpi(Number(e.target.value))} className="w-full" />
+                                    </div>
+                                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">獲得ユーザー数</span>
+                                        <span className="text-lg font-black text-indigo-600">{Math.floor(metrics.users).toLocaleString()} 人</span>
+                                    </div>
                                 </div>
-                                <SliderGroup label="広告予算" value={adBudget} min={100000} max={50000000} step={100000} unit="円" onChange={setAdBudget} />
-                                <SliderGroup label="CPI (獲得単価)" value={cpi} min={1} max={100000} step={1} unit="円" onChange={setCpi} colorClass="text-rose-600" />
-                                <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Total Users</span>
-                                    <span className="text-sm font-black text-slate-800">{Math.floor(metrics.totalUsers).toLocaleString()} 人</span>
-                                </div>
-                            </Card>
+                            </section>
 
-                            <Card>
-                                <div className="flex items-center gap-2 mb-6">
-                                    <i data-lucide="layers" className="w-4 h-4 text-rose-600"></i>
-                                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">利用量（原価変動）</h3>
+                            {/* Costs */}
+                            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <i data-lucide="cpu" className="w-3 h-3"></i> 機能別利用量 (原価計算)
+                                </h2>
+                                <div className="space-y-4">
+                                    {[
+                                        { label: "会話 (分/月)", val: chatMins, set: setChatMins, max: 600 },
+                                        { label: "アバター作成 (体/月)", val: avatarCount, set: setAvatarCount, max: 20 },
+                                        { label: "コンテンツ生成 (本/月)", val: contentCount, set: setContentCount, max: 100 },
+                                        { label: "ライブ配信 (分/月)", val: liveMins, set: setLiveMins, max: 300 },
+                                        { label: "ラジオ配信 (分/月)", val: radioMins, set: setRadioMins, max: 600 }
+                                    ].map((item, i) => (
+                                        <div key={i} className="space-y-1">
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-500"><span>{item.label}</span><span>{item.val}</span></div>
+                                            <input type="range" min="0" max={item.max} value={item.val} onChange={e => item.set(Number(e.target.value))} className="w-full" />
+                                        </div>
+                                    ))}
                                 </div>
-                                <SliderGroup label="会話 (分/月)" value={chatMins} min={0} max={600} step={10} unit="分" onChange={setChatMins} />
-                                <SliderGroup label="アバター (体/月)" value={avatarCount} min={0} max={10} step={1} unit="体" onChange={setAvatarCount} />
-                                <SliderGroup label="生成 (本/月)" value={contentCount} min={0} max={100} step={5} unit="本" onChange={setContentCount} />
-                                <SliderGroup label="ライブ (分/月)" value={liveMins} min={0} max={120} step={5} unit="分" onChange={setLiveMins} />
-                                <SliderGroup label="ラジオ (分/月)" value={radioMins} min={0} max={300} step={10} unit="分" onChange={setRadioMins} />
-                            </Card>
+                            </section>
 
-                            <Card>
-                                <div className="flex items-center gap-2 mb-6">
-                                    <i data-lucide="banknote" className="w-4 h-4 text-emerald-600"></i>
-                                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">収益ロジック</h3>
+                            {/* Revenue */}
+                            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <i data-lucide="banknote" className="w-3 h-3"></i> 収益ロジック
+                                </h2>
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>広告収益 / ユーザー</span><span>¥{adRevPerUser}</span></div>
+                                        <input type="range" min="0" max="1000" step="10" value={adRevPerUser} onChange={e => setAdRevPerUser(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>クリエイター収益単価</span><span>¥{creatorRevPerUser}</span></div>
+                                        <input type="range" min="0" max="2000" step="50" value={creatorRevPerUser} onChange={e => setCreatorRevPerUser(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>クリエイター数</span><span>{creatorCount}人</span></div>
+                                        <input type="range" min="1" max="100" value={creatorCount} onChange={e => setCreatorCount(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>認証バッジ単価</span><span>¥{badgePrice}</span></div>
+                                        <input type="range" min="500" max="10000" step="100" value={badgePrice} onChange={e => setBadgePrice(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-[10px] font-bold"><span>バッジ転換率</span><span>{badgeConv}%</span></div>
+                                        <input type="range" min="0.1" max="30" step="0.1" value={badgeConv} onChange={e => setBadgeConv(Number(e.target.value))} />
+                                    </div>
                                 </div>
-                                <SliderGroup label="広告単価 / ユーザー" value={adUnitPrice} min={0} max={500} step={5} unit="円" onChange={setAdUnitPrice} />
-                                <SliderGroup label="クリエイター単価" value={creatorUnitPrice} min={0} max={1000} step={10} unit="円" onChange={setCreatorUnitPrice} />
-                                <SliderGroup label="クリエイター数" value={creatorCount} min={1} max={100} step={1} unit="名" onChange={setCreatorCount} />
-                                <SliderGroup label="バッジ単価" value={badgeUnitPrice} min={500} max={10000} step={100} unit="円" onChange={setBadgeUnitPrice} />
-                                <SliderGroup label="バッジCV率" value={badgeConvRate} min={0.1} max={20} step={0.1} unit="%" onChange={setBadgeConvRate} />
-                            </Card>
+                            </section>
                         </div>
 
-                        {/* 右パネル */}
+                        {/* Result Column */}
                         <div className="lg:col-span-8 space-y-6">
+                            {/* Scoreboard */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <Card className={`border-l-4 ${metrics.netProfit > 0 ? 'border-emerald-500' : 'border-rose-500'}`}>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">営業損益</p>
-                                    <h2 className={`text-2xl font-black ${metrics.netProfit > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                        ¥{Math.floor(metrics.netProfit).toLocaleString()}
-                                    </h2>
-                                </Card>
-                                <Card className="border-l-4 border-indigo-500">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">月間収益</p>
-                                    <h2 className="text-2xl font-black text-slate-800">
-                                        ¥{Math.floor(metrics.totalRevenue).toLocaleString()}
-                                    </h2>
-                                </Card>
-                                <Card className="border-l-4 border-rose-500">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">総原価</p>
-                                    <h2 className="text-2xl font-black text-slate-800">
-                                        ¥{Math.floor(metrics.totalCogs + adBudget).toLocaleString()}
-                                    </h2>
-                                </Card>
+                                <div className={`p-6 rounded-3xl shadow-sm border-l-8 ${metrics.profit > 0 ? 'bg-emerald-50 border-emerald-500 text-emerald-900' : 'bg-rose-50 border-rose-500 text-rose-900'}`}>
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">月間営業利益</p>
+                                    <p className="text-3xl font-black">{formatCurrency(metrics.profit)}</p>
+                                </div>
+                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">月間総収益</p>
+                                    <p className="text-3xl font-black text-slate-800">{formatCurrency(metrics.totalRev)}</p>
+                                </div>
+                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">総原価(AI+獲得)</p>
+                                    <p className="text-3xl font-black text-slate-800">{formatCurrency(metrics.totalCogs + adBudget)}</p>
+                                </div>
                             </div>
 
+                            {/* Charts */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Card>
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">収益内訳</h4>
+                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">収益内訳</h3>
                                     <div className="h-64">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={metrics.revData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                                            <BarChart data={metrics.revBreakdown} layout="vertical">
                                                 <XAxis type="number" hide />
                                                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} width={80} />
-                                                <Tooltip formatter={(v) => `¥${v.toLocaleString()}`} />
-                                                <Bar dataKey="value" radius={[0, 5, 5, 0]} barSize={20}>
-                                                    {metrics.revData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                <Tooltip formatter={v => formatCurrency(v)} />
+                                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={30}>
+                                                    {metrics.revBreakdown.map((entry, index) => (
+                                                        <Cell key={index} fill={entry.color} />
                                                     ))}
                                                 </Bar>
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>
-                                </Card>
+                                </div>
 
-                                <Card>
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">機能別原価</h4>
+                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">機能別原価比率</h3>
                                     <div className="h-64">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
-                                                <Pie data={metrics.costData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={5}>
+                                                <Pie data={metrics.costBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5}>
                                                     <Cell fill="#f43f5e" />
                                                     <Cell fill="#fb7185" />
                                                     <Cell fill="#fda4af" />
                                                     <Cell fill="#fecdd3" />
                                                     <Cell fill="#94a3b8" />
                                                 </Pie>
-                                                <Tooltip formatter={(v) => `¥${v.toLocaleString()}`} />
+                                                <Tooltip formatter={v => formatCurrency(v)} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
-                                </Card>
+                                    <div className="flex flex-wrap justify-center gap-2 mt-2">
+                                        {metrics.costBreakdown.map((c, i) => (
+                                            <span key={i} className="text-[8px] font-bold text-slate-400 flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: ['#f43f5e','#fb7185','#fda4af','#fecdd3','#94a3b8'][i]}}></span>
+                                                {c.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
-                            <Card className="bg-slate-900 text-white border-none">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <i data-lucide="zap" className="w-4 h-4 text-amber-400"></i>
-                                    <h3 className="text-xs font-black text-indigo-300 uppercase tracking-widest">Unit Economics</h3>
+                            {/* Strategic Insight */}
+                            <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
+                                <div className="flex items-center gap-3 mb-6 text-amber-400">
+                                    <i data-lucide="zap" className="w-5 h-5"></i>
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em]">Unit Economics Insight</h3>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                                     <div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase">Revenue / User</p>
-                                        <p className="text-lg font-black">¥{Math.floor(metrics.totalRevenue / metrics.totalUsers).toLocaleString()}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">ARPU (月間単価)</p>
+                                        <p className="text-xl font-black">¥{Math.floor(metrics.totalRev / metrics.users).toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase">Cost / User</p>
-                                        <p className="text-lg font-black text-rose-400">¥{Math.floor(metrics.varCostPerUser).toLocaleString()}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">COGS / User</p>
+                                        <p className="text-xl font-black text-rose-400">¥{Math.floor(metrics.costPerUser).toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase">Margin / User</p>
-                                        <p className="text-lg font-black text-emerald-400">¥{Math.floor((metrics.totalRevenue / metrics.totalUsers) - metrics.varCostPerUser).toLocaleString()}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">限界利益 / 人</p>
+                                        <p className="text-xl font-black text-emerald-400">¥{Math.floor(metrics.totalRev / metrics.users - metrics.costPerUser).toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase">Break-even CPI</p>
-                                        <p className="text-lg font-black text-amber-400">¥{Math.floor(metrics.totalRevenue / metrics.totalUsers - metrics.varCostPerUser).toLocaleString()}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">最大許容CPI</p>
+                                        <p className="text-xl font-black text-amber-400">¥{Math.floor(metrics.totalRev / metrics.users - metrics.costPerUser).toLocaleString()}</p>
                                     </div>
                                 </div>
-                            </Card>
+                            </div>
                         </div>
                     </main>
                 </div>
