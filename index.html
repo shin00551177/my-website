@@ -1,79 +1,63 @@
 import React, { useState } from 'react';
-import { Line } from 'recharts';
+import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Bar } from 'recharts';
+import 'tailwindcss/tailwind.css';
 
-const Dashboard = () => {
-  // State hooks for user count, CPI, and costs
-  const [userCount, setUserCount] = useState(1);
-  const [cpi, setCpi] = useState(0);
-  const [chatUsage, setChatUsage] = useState(0);
-  const [avatarCreation, setAvatarCreation] = useState(0);
-  const [contentGeneration, setContentGeneration] = useState(0);
-  const [liveStreaming, setLiveStreaming] = useState(0);
-  const [radio, setRadio] = useState(0);
+const MyDashboard = () => {
+  const [userCount, setUserCount] = useState(500000);
+  const [cpi, setCpi] = useState(50000);
+  const creatorCount = 5;
+  const paidConversionRate = 0.1; // 10%
 
-  // Feature-based cost calculation
-  const unitPrices = { chat: 60, avatar: 80, content: 120, live: 90, radio: 20 };
-  const chatCost = unitPrices.chat * chatUsage * userCount;
-  const avatarCost = unitPrices.avatar * avatarCreation * userCount;
-  const contentCost = unitPrices.content * contentGeneration * userCount;
-  const liveCost = unitPrices.live * liveStreaming * userCount;
-  const radioCost = unitPrices.radio * radio * userCount;
+  const costs = {
+    chat: 60,  // yen/min
+    avatarCreation: 80,
+    contentGeneration: 120,
+    liveStreaming: 90,
+    radio: 20,
+  };
 
-  // Revenue stream calculations
-  const creatorRevenue = unitPrices.chat * userCount * 1; // Assuming 1 creator
-  const advertisingRevenue = cpi * userCount;
-  const authenticationBadgeRevenue = 100 * userCount; // Assuming 100 yen per badge
+  const totalCost = (usageTime) => {
+    return (costs.chat * usageTime) + 
+           (costs.avatarCreation * userCount) + 
+           (costs.contentGeneration * userCount) + 
+           (costs.liveStreaming * usageTime) + 
+           (costs.radio * usageTime);
+  };
+
+  const creatorRevenue = (userCount * creatorCount) * 1000; // unit price of 1000 yen
+  const advertisingRevenue = userCount * cpi;
+  const authBadgeRevenue = userCount * paidConversionRate * 500; // unit price of 500 yen
+
+  const data = [
+    { name: 'Costs', value: totalCost(60) },  // assuming 60 minutes of usage
+    { name: 'Creator Revenue', value: creatorRevenue },
+    { name: 'Advertising Revenue', value: advertisingRevenue },
+    { name: 'Auth Badge Revenue', value: authBadgeRevenue }
+  ];
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Cost and Revenue Dashboard</h1>
-      <div className="mb-4">
-        <label>User Count:</label>
-        <input type="range" min="1" max="1000000" value={userCount} onChange={(e) => setUserCount(e.target.value)} />
-      </div>
-      <div className="mb-4">
-        <label>CPI:</label>
-        <input type="range" min="1" max="100000" value={cpi} onChange={(e) => setCpi(e.target.value)} />
-      </div>
+    <div className="flex h-screen bg-gray-100">
+      <div className="w-1/4 bg-white p-5 shadow-md">
+        <h2 className="text-xl font-bold">Settings</h2>
+        <label className="block mt-4">User Count (1 - 1,000,000):</label>
+        <input type="range" min="1" max="1000000" value={userCount} onChange={(e) => setUserCount(e.target.value)} className="slider w-full"/>
 
-      <h2 className="font-bold mt-4">Feature Costs:</h2>
-      <div className="space-y-4">
-        <div>
-          <label>Chat Usage (min):</label>
-          <input type="number" value={chatUsage} onChange={(e) => setChatUsage(e.target.value)} />
-          <p>Cost: {chatCost} yen</p>
-        </div>
-        <div>
-          <label>Avatar Creation:</label>
-          <input type="number" value={avatarCreation} onChange={(e) => setAvatarCreation(e.target.value)} />
-          <p>Cost: {avatarCost} yen</p>
-        </div>
-        <div>
-          <label>Content Generation:</label>
-          <input type="number" value={contentGeneration} onChange={(e) => setContentGeneration(e.target.value)} />
-          <p>Cost: {contentCost} yen</p>
-        </div>
-        <div>
-          <label>Live Streaming (min):</label>
-          <input type="number" value={liveStreaming} onChange={(e) => setLiveStreaming(e.target.value)} />
-          <p>Cost: {liveCost} yen</p>
-        </div>
-        <div>
-          <label>Radio (mins):</label>
-          <input type="number" value={radio} onChange={(e) => setRadio(e.target.value)} />
-          <p>Cost: {radioCost} yen</p>
-        </div>
+        <label className="block mt-4">CPI (1 - 100,000 yen):</label>
+        <input type="range" min="1" max="100000" value={cpi} onChange={(e) => setCpi(e.target.value)} className="slider w-full"/>
       </div>
-
-      <h2 className="font-bold mt-4">Revenue:</h2>
-      <p>Creator Revenue: {creatorRevenue} yen</p>
-      <p>Advertising Revenue: {advertisingRevenue} yen</p>
-      <p>Authentication Badge Revenue: {authenticationBadgeRevenue} yen</p>
-
-      {/* Charts can be implemented here using Recharts */}
-      {/* Example: <Line data={data} /> */}
+      <div className="flex-grow p-5">
+        <h2 className="text-xl font-bold">Cost Structure</h2>
+        <BarChart width={600} height={300} data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="value" fill="#8884d8" />
+        </BarChart>
+      </div>
     </div>
   );
 };
 
-export default Dashboard;
+export default MyDashboard;
