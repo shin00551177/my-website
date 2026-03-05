@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar Strategic Dashboard - Professional Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
+        input[type='range'] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type='range']::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+
+        input[type='range']::-webkit-slider-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s;
+        }
+
+        input[type='range']::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .kpi-card {
+            transition: all 0.2s;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .kpi-card:hover {
+            border-color: #4f46e5;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, AreaChart, Area, Legend } = Recharts;
+
+        const IconInit = () => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+            return null;
+        };
+
+        const Card = ({ children, className = "" }) => (
+            <div className={`bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200 ${className}`}>
+                {children}
+            </div>
+        );
+
+        const InputHeader = ({ icon, title, color }) => (
+            <div className="flex items-center gap-2 mb-4 mt-6 first:mt-0">
+                <div className={`p-1.5 rounded-lg ${color}`}>
+                    <i data-lucide={icon} className="w-3.5 h-3.5"></i>
+                </div>
+                <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400">{title}</h4>
+            </div>
+        );
+
+        const App = () => {
+            const [isJpy, setIsJpy] = useState(true);
+            const exchangeRate = 155;
+
+            // --- Presets ---
+            const presets = {
+                year1: { budget: 6452, cpi: 1.0, infFol: 1000000, reach: 10, infCvr: 1, expRate: 60, regRate: 30, payCvr: 2, arpu: 10, adArpu: 0.5, ret: 4, k: 0.1, b2b: 10000000 },
+                year2: { budget: 129032, cpi: 1.5, infFol: 5000000, reach: 15, infCvr: 2, expRate: 70, regRate: 45, payCvr: 5, arpu: 15, adArpu: 1.5, ret: 8, k: 0.3, b2b: 100000000 },
+                year3: { budget: 967741, cpi: 2.5, infFol: 20000000, reach: 20, infCvr: 3, expRate: 85, regRate: 60, payCvr: 10, arpu: 20, adArpu: 3.0, ret: 12, k: 0.5, b2b: 500000000 },
+            };
+
+            const [adBudget, setAdBudget] = useState(presets.year2.budget);
+            const [cpi, setCpi] = useState(presets.year2.cpi);
+            const [infFollowers, setInfFollowers] = useState(presets.year2.infFol);
+            const [infReachRate, setInfReachRate] = useState(presets.year2.reach);
+            const [infConvRate, setInfConvRate] = useState(presets.year2.infCvr);
+            const [experienceRate, setExperienceRate] = useState(presets.year2.expRate);
+            const [regRate, setRegRate] = useState(presets.year2.regRate);
+            const [payConvRate, setPayConvRate] = useState(presets.year2.payCvr);
+            const [arpuPaid, setArpuPaid] = useState(presets.year2.arpu);
+            const [adArpuMau, setAdArpuMau] = useState(presets.year2.adArpu);
+            const [retentionMonths, setRetentionMonths] = useState(presets.year2.ret);
+            const [kFactor, setKFactor] = useState(presets.year2.k);
+            const [b2bRevenue, setB2bRevenue] = useState(presets.year2.b2b);
+
+            const applyPreset = (y) => {
+                const p = presets[y];
+                setAdBudget(p.budget); setCpi(p.cpi); setInfFollowers(p.infFol);
+                setInfReachRate(p.reach); setInfConvRate(p.infCvr); setExperienceRate(p.expRate);
+                setRegRate(p.regRate); setPayConvRate(p.payCvr); setArpuPaid(p.arpu);
+                setAdArpuMau(p.adArpu); setRetentionMonths(p.ret); setKFactor(p.k); setB2bRevenue(p.b2b);
+            };
+
+            const formatVal = (val, isCurrency = true, compact = false) => {
+                const actualVal = isCurrency ? (isJpy ? val * exchangeRate : val) : val;
+                if (compact) {
+                    return new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1, style: isCurrency ? 'currency' : 'decimal', currency: isJpy ? 'JPY' : 'USD' }).format(actualVal);
+                }
+                const symbol = isJpy ? '¥' : '$';
+                return isCurrency
+                    ? `${symbol}${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(actualVal)}`
+                    : new Intl.NumberFormat('ja-JP').format(Math.floor(val));
+            };
+
+            const metrics = useMemo(() => {
+                const paidInstalls = adBudget / (cpi || 0.1);
+                const infReach = infFollowers * (infReachRate / 100);
+                const infInstalls = infReach * (infConvRate / 100);
+                const baseInstalls = paidInstalls + infInstalls;
+                const viralInstalls = baseInstalls * kFactor;
+                const totalInstalls = baseInstalls + viralInstalls;
+
+                const activatedUsers = totalInstalls * (experienceRate / 100);
+                const registeredUsers = activatedUsers * (regRate / 100);
+                const payingUsers = registeredUsers * (payConvRate / 100);
+
+                const monthlyDirectRev = payingUsers * arpuPaid;
+                const monthlyAdRev = activatedUsers * adArpuMau;
+                const mrr = monthlyDirectRev + monthlyAdRev + (b2bRevenue / 12);
+                const annualRevenue = mrr * 12;
+
+                const blendedCac = adBudget / (totalInstalls || 1);
+                const paidCac = adBudget / (paidInstalls || 1);
+                const payingUserCac = adBudget / (payingUsers || 1);
+
+                const ltv = (arpuPaid * (payConvRate / 100) + adArpuMau) * retentionMonths;
+                const ltvCacRatio = ltv / (blendedCac || 1);
+                const roas = (annualRevenue / (adBudget * 12)) * 100;
+
+                const recs = [];
+                if (annualRevenue < 3000000000) recs.push({ type: 'target', text: '目標30億USD未達。B2B展開の強化か、インフルエンサー獲得比率の向上が必要です。' });
+                if (ltvCacRatio < 3) recs.push({ type: 'warning', text: 'LTV/CAC比率が3倍未満です。継続期間を伸ばすプロダクト改善が必要です。' });
+                if (roas < 200) recs.push({ type: 'action', text: 'ROASが低迷。CPI抑制または課金転換率（Register→Paid）の改善が急務。' });
+
+                return {
+                    paidInstalls, infReach, infInstalls, totalInstalls, viralInstalls,
+                    activatedUsers, registeredUsers, payingUsers,
+                    mrr, annualRevenue, ltv, blendedCac, paidCac, payingUserCac, ltvCacRatio, roas, recs,
+                    funnelData: [
+                        { name: '獲得数', value: totalInstalls, desc: 'DL総数' },
+                        { name: 'アクティブ', value: activatedUsers, desc: '初期体験' },
+                        { name: '登録', value: registeredUsers, desc: '会員登録' },
+                        { name: '課金', value: payingUsers, desc: 'マネタイズ' }
+                    ],
+                    portfolio: [
+                        { name: '広告収入', value: activatedUsers * adArpuMau * 12, color: '#6366f1' },
+                        { name: '課金収入', value: payingUsers * arpuPaid * 12, color: '#2dd4bf' },
+                        { name: 'B2B/IP', value: b2bRevenue, color: '#f59e0b' }
+                    ],
+                    acquisitionSource: [
+                        { name: '有料広告', value: paidInstalls, color: '#4f46e5' },
+                        { name: 'インフルエンサー', value: infInstalls, color: '#10b981' },
+                        { name: 'バイラル', value: viralInstalls, color: '#f59e0b' }
+                    ]
+                };
+            }, [adBudget, cpi, infFollowers, infReachRate, infConvRate, experienceRate, regRate, payConvRate, arpuPaid, adArpuMau, retentionMonths, kFactor, b2bRevenue]);
+
+            return (
+                <div className="min-h-screen bg-slate-50 pb-12">
+                    <IconInit />
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+                        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
+                                    <i data-lucide="bar-chart-3" className="text-white w-5 h-5"></i>
+                                </div>
+                                <h1 className="text-lg font-black text-slate-800 tracking-tight">AI AVATAR STRATEGIC MATRIX</h1>
+                            </div>
+                            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                                <button onClick={() => setIsJpy(false)} className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-all ${!isJpy ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>USD</button>
+                                <button onClick={() => setIsJpy(true)} className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-all ${isJpy ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>JPY</button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-7xl mx-auto px-6 pt-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+                        {/* --- UNIFIED CONTROL SIDEBAR --- */}
+                        <aside className="lg:col-span-4 space-y-4 lg:sticky lg:top-24 h-[calc(100vh-8rem)] overflow-y-auto no-scrollbar pb-10">
+                            <Card className="p-8 border-indigo-100">
+                                <div className="flex items-center justify-between mb-8 border-b border-slate-50 pb-4">
+                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                        <i data-lucide="sliders-horizontal" className="w-4 h-4 text-indigo-500"></i> 変数コントロール
+                                    </h3>
+                                    <div className="flex gap-1">
+                                        {['year1', 'year2', 'year3'].map((y, i) => (
+                                            <button key={y} onClick={() => applyPreset(y)} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-black uppercase hover:bg-indigo-600 hover:text-white transition-all">Y{i + 1}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <InputHeader icon="target" title="経営・財務戦略" color="bg-indigo-50 text-indigo-600" />
+                                <div className="space-y-6 mb-10">
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>広告予算 / 月</span><span className="text-indigo-600">{formatVal(adBudget)}</span></div>
+                                        <input type="range" min="6451" max="2000000" step="1000" value={adBudget} onChange={e => setAdBudget(Number(e.target.value))} />
+                                        <p className="text-[10px] text-slate-400">最小予算: 約100万円</p>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>B2B 年間収益</span><span className="text-indigo-600">{formatVal(b2bRevenue)}</span></div>
+                                        <input type="range" min="0" max="1000000000" step="1000000" value={b2bRevenue} onChange={e => setB2bRevenue(Number(e.target.value))} />
+                                    </div>
+                                </div>
+
+                                <InputHeader icon="trending-up" title="獲得・インフルエンサー" color="bg-emerald-50 text-emerald-600" />
+                                <div className="space-y-6 mb-10">
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>広告獲得 CPI</span><span className="text-emerald-600">{formatVal(cpi)}</span></div>
+                                        <input type="range" min="0.1" max="10" step="0.1" value={cpi} onChange={e => setCpi(Number(e.target.value))} />
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">提携インフルエンサー フォロワー計</div>
+                                            <input type="range" min="100000" max="50000000" step="100000" value={infFollowers} onChange={e => setInfFollowers(Number(e.target.value))} />
+                                            <div className="text-xs font-black text-slate-700">{formatVal(infFollowers, false)}人</div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase">リーチ率 (%)</div>
+                                                <input type="range" min="1" max="50" step="1" value={infReachRate} onChange={e => setInfReachRate(Number(e.target.value))} />
+                                                <div className="text-[10px] font-bold">{infReachRate}%</div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase">CVR (%)</div>
+                                                <input type="range" min="0.1" max="10" step="0.1" value={infConvRate} onChange={e => setInfConvRate(Number(e.target.value))} />
+                                                <div className="text-[10px] font-bold">{infConvRate}%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>バイラル係数 (K)</span><span className="text-emerald-600">{kFactor.toFixed(2)}</span></div>
+                                        <input type="range" min="0" max="1.5" step="0.05" value={kFactor} onChange={e => setKFactor(Number(e.target.value))} />
+                                    </div>
+                                </div>
+
+                                <InputHeader icon="heart" title="プロダクト・マネタイズ" color="bg-rose-50 text-rose-600" />
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">会員登録率 (%)</div>
+                                            <input type="range" min="1" max="90" step="1" value={regRate} onChange={e => setRegRate(Number(e.target.value))} />
+                                            <div className="text-xs font-black">{regRate}%</div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">課金転換率 (%)</div>
+                                            <input type="range" min="0.1" max="30" step="0.1" value={payConvRate} onChange={e => setPayConvRate(Number(e.target.value))} />
+                                            <div className="text-xs font-black">{payConvRate}%</div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>課金者 ARPU (月額)</span><span className="text-rose-600">{formatVal(arpuPaid)}</span></div>
+                                        <input type="range" min="5" max="200" step="5" value={arpuPaid} onChange={e => setArpuPaid(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-xs font-bold text-slate-600"><span>平均継続月数</span><span className="text-rose-600">{retentionMonths}M</span></div>
+                                        <input type="range" min="1" max="48" step="1" value={retentionMonths} onChange={e => setRetentionMonths(Number(e.target.value))} />
+                                    </div>
+                                </div>
+                            </Card>
+                        </aside>
+
+                        {/* --- MAIN DASHBOARD AREA --- */}
+                        <div className="lg:col-span-8 space-y-6">
+
+                            {/* Strategy AI Banner */}
+                            <div className="bg-white border-l-4 border-indigo-600 rounded-3xl p-6 shadow-sm flex items-start gap-4">
+                                <div className="p-3 bg-indigo-50 rounded-2xl"><i data-lucide="zap" className="w-6 h-6 text-indigo-600"></i></div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter mb-4">AI 戦略シミュレーション・インサイト</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {metrics.recs.map((rec, i) => (
+                                            <div key={i} className="text-[11px] font-bold text-slate-600 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                <i data-lucide="check-circle" className="w-3 h-3 text-indigo-500"></i> {rec.text}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* KPI Scorecard */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {[
+                                    { label: "年間予測収益", val: formatVal(metrics.annualRevenue, true, true), icon: "dollar-sign", color: "text-indigo-600", desc: "収益目標" },
+                                    { label: "全体 CAC", val: formatVal(metrics.blendedCac), icon: "trending-down", color: "text-emerald-500", desc: "1DL獲得単価" },
+                                    { label: "生涯価値 (LTV)", val: formatVal(metrics.ltv), icon: "heart", color: "text-rose-500", desc: "1ユーザーLTV" },
+                                    { label: "ROAS (年間)", val: `${metrics.roas.toFixed(0)}%`, icon: "zap", color: "text-indigo-600", desc: "広告回収効率" }
+                                ].map((kpi, i) => (
+                                    <Card key={i} className="kpi-card p-5 flex flex-col justify-between h-32">
+                                        <div className="flex justify-between items-start">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{kpi.label}</span>
+                                            <i data-lucide={kpi.icon} className={`w-3.5 h-3.5 opacity-20 ${kpi.color}`}></i>
+                                        </div>
+                                        <div>
+                                            <div className={`text-xl font-black ${kpi.color}`}>{kpi.val}</div>
+                                            <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">{kpi.desc}</p>
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+
+                            {/* Acquisition Simulation Section (NEW) */}
+                            <Card className="p-8 border-indigo-50 bg-gradient-to-br from-white to-indigo-50/30">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <i data-lucide="users" className="w-3.5 h-3.5"></i> 獲得チャネル構成シミュレーション
+                                    </h4>
+                                    <div className="flex gap-4">
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase">Paid CAC</p>
+                                            <p className="text-xs font-black text-slate-700">{formatVal(metrics.paidCac)}</p>
+                                        </div>
+                                        <div className="text-right border-l border-slate-200 pl-4">
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase">Blended CAC</p>
+                                            <p className="text-xs font-black text-indigo-600">{formatVal(metrics.blendedCac)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                                    <div className="md:col-span-7 h-56">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={metrics.acquisitionSource} layout="vertical">
+                                                <XAxis type="number" hide />
+                                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} width={100} />
+                                                <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '12px' }} />
+                                                <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={24}>
+                                                    {metrics.acquisitionSource.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="md:col-span-5 space-y-4">
+                                        {metrics.acquisitionSource.map((s, i) => (
+                                            <div key={i} className="flex justify-between items-center p-3 bg-white/50 rounded-2xl border border-slate-100">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }}></div>
+                                                    <span className="text-[10px] font-bold text-slate-600 uppercase">{s.name}</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xs font-black text-slate-800">{formatVal(s.value, false)}人</p>
+                                                    <p className="text-[8px] font-bold text-slate-400">({((s.value / metrics.totalInstalls) * 100).toFixed(1)}%)</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="pt-2 border-t border-indigo-100">
+                                            <div className="flex justify-between items-center px-3">
+                                                <span className="text-[10px] font-black text-indigo-600 uppercase">合計獲得数</span>
+                                                <span className="text-sm font-black text-indigo-600">{formatVal(metrics.totalInstalls, false)}人 / 月</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Funnel */}
+                                <Card className="p-8">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 text-center flex items-center justify-center gap-2">
+                                        <i data-lucide="filter" className="w-3.5 h-3.5"></i> ユーザーファネル
+                                    </h4>
+                                    <div className="h-48 mb-6">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={metrics.funnelData}>
+                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#94a3b8' }} />
+                                                <YAxis hide />
+                                                <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                                <Bar dataKey="value" radius={[8, 8, 8, 8]} barSize={40}>
+                                                    {metrics.funnelData.map((e, i) => <Cell key={i} fill={i === 3 ? '#4f46e5' : '#e2e8f0'} />)}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1 text-center border-t border-slate-50 pt-4">
+                                        {metrics.funnelData.map((s, i) => (
+                                            <div key={i}>
+                                                <p className="text-[10px] font-black text-slate-800">{formatVal(s.value, false, true)}</p>
+                                                <p className="text-[8px] text-slate-400 font-bold uppercase">{s.desc}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+
+                                {/* Revenue Portforlio */}
+                                <Card className="p-8">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 text-center flex items-center justify-center gap-2">
+                                        <i data-lucide="pie-chart" className="w-3.5 h-3.5"></i> 収益ポートフォリオ
+                                    </h4>
+                                    <div className="h-48">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={metrics.portfolio} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={5} stroke="none">
+                                                    {metrics.portfolio.map((e, i) => <Cell key={i} fill={e.color} />)}
+                                                </Pie>
+                                                <RechartsTooltip formatter={(v) => formatVal(v)} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2">
+                                        {metrics.portfolio.map(p => (
+                                            <div key={p.name} className="flex items-center gap-1.5">
+                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }}></div>
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase">{p.name} ({(p.value / (metrics.annualRevenue || 1) * 100).toFixed(0)}%)</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+                            </div>
+
+                            {/* Executive Road to 3B USD */}
+                            <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl">
+                                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-600/20 rounded-full blur-[100px] -mr-40 -mt-40"></div>
+                                <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    <div>
+                                        <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3 italic">Investment Summary</p>
+                                        <p className="text-5xl font-black tracking-tight mb-8 leading-tight">
+                                            {formatVal(metrics.annualRevenue)} <span className="text-sm font-normal text-slate-500">Forecast / Year</span>
+                                        </p>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center text-xs pb-3 border-b border-white/10 group cursor-default">
+                                                <span className="text-slate-400 group-hover:text-white transition-colors uppercase tracking-widest font-bold">Monthly MRR</span>
+                                                <span className="text-xl font-black">{formatVal(metrics.mrr)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] text-indigo-300 font-bold uppercase tracking-widest">
+                                                <span>LTV / CAC Ratio</span>
+                                                <span className={`text-lg ${metrics.ltvCacRatio >= 3 ? 'text-emerald-400' : 'text-amber-400'}`}>{metrics.ltvCacRatio.toFixed(2)}x</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] text-indigo-300 font-bold uppercase tracking-widest">
+                                                <span>Estimated CAC (Paying User)</span>
+                                                <span className="text-lg text-white">{formatVal(metrics.payingUserCac)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-md flex flex-col justify-center items-center">
+                                        <div className="w-16 h-16 rounded-2xl bg-indigo-600/30 flex items-center justify-center mb-6">
+                                            <i data-lucide="target" className="w-8 h-8 text-indigo-400"></i>
+                                        </div>
+                                        <p className="text-[11px] font-black text-indigo-300 uppercase tracking-widest mb-2">30億USD目標到達率</p>
+                                        <p className="text-7xl font-black text-white tracking-tighter mb-6">{Math.min(100, (metrics.annualRevenue / 3000000000) * 100).toFixed(1)}%</p>
+                                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden shadow-inner">
+                                            <div className="h-full bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.6)] transition-all duration-1000" style={{ width: `${Math.min(100, (metrics.annualRevenue / 3000000000) * 100)}%` }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Mathematical Proof Section */}
+                            <Card className="bg-white border-slate-200">
+                                <div className="flex flex-col md:flex-row items-center gap-8">
+                                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 text-center min-w-[160px] shadow-inner">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Blended CAC</p>
+                                        <p className="text-3xl font-black text-indigo-600">{formatVal(metrics.blendedCac)}</p>
+                                    </div>
+                                    <div className="flex-1 space-y-3">
+                                        <h5 className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                            <i data-lucide="shield-check" className="w-4 h-4 text-emerald-500"></i>
+                                            ビジネスモデルの数学的正当性
+                                        </h5>
+                                        <p className="text-[12px] text-slate-500 leading-relaxed italic">
+                                            広告CPI（{formatVal(cpi)}）だけに頼らず、インフルエンサー経由（{formatVal(metrics.infInstalls, false)}人）とバイラル（K={kFactor.toFixed(2)}）を組み合わせることで、
+                                            全体CACを大幅に圧縮しています。このスプレッド（LTV - CAC = {formatVal(metrics.ltv - metrics.blendedCac)}）こそが、
+                                            AIアバター事業の幾何級数的な成長を支えるエンジンとなります。
+                                        </p>
+                                    </div>
+                                </div>
+                            </Card>
+
+                        </div>
+                    </main>
+
+                    <footer className="max-w-7xl mx-auto px-6 mt-20 py-10 border-t border-slate-200 text-center">
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em]">Global Strategy Simulator Pro Edition v6.5 - Acquisition Insight Update</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
